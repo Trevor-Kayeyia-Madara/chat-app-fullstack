@@ -1,116 +1,92 @@
 # Real-Time Chat App Showcase
 
-A web-based real-time chat application demonstrating modern full-stack development. This project highlights real-time messaging, multi-room chat, and persistent data storage, making it a strong portfolio piece for full-stack web development.
-
----
+A web-based real-time chat application demonstrating modern full-stack development. It highlights real-time messaging, multi-room chat, persistent data storage, and horizontal scaling with Redis pub/sub for Socket.IO.
 
 ## Project Overview
 
-- **Frontend:** SvelteKit + TailwindCSS  
-- **Backend:** Express.js + Socket.IO  
-- **Database:** MongoDB  
-- **Dockerized:** Fully containerized for easy local development and deployment  
+- Frontend: SvelteKit + TailwindCSS
+- Backend: Express.js + Socket.IO
+- Database: MongoDB
+- Realtime Scaling: Redis adapter for Socket.IO pub/sub
+- Dockerized: Fully containerized for local development and deployment
 
-**Live Demo (Local)**  
+Local URLs:
 
-- Frontend: [http://localhost:3000](http://localhost:3000)  
-- Backend API & Socket.IO: [http://localhost:5000](http://localhost:5000)  
-
-**Start all services with Docker Compose:**
-
-```bash
-git clone <repository-url>
-cd chat-showcase
-docker-compose up --build
-````
-
----
+- Frontend: [http://localhost:3000](http://localhost:3000)
+- Backend API + Socket.IO: [http://localhost:5000](http://localhost:5000)
 
 ## Features
 
-- Real-Time Messaging: Instant delivery of messages via Socket.IO
-- Multi-Room Chat: Users can join or create multiple rooms
-- Persistent Chat History: Messages stored in MongoDB for retrieval
-- Responsive UI: Mobile-friendly interface built with TailwindCSS
-- Dockerized Setup: Easy reproducibility for development and deployment
-
----
+- Real-time messaging via Socket.IO
+- Multi-room chat (join/create rooms)
+- Persistent chat history in MongoDB
+- Responsive UI (TailwindCSS)
+- Dockerized environment with reproducible setup
+- Horizontal Socket.IO scaling with Redis pub/sub
 
 ## Technology Stack
 
-| Layer            | Technology                               |
-| ---------------- | ---------------------------------------- |
-| Frontend         | SvelteKit, TailwindCSS, Socket.IO client |
-| Backend          | Node.js, Express.js, Socket.IO server    |
-| Database         | MongoDB (Mongoose ORM)                   |
-| Deployment & Dev | Docker, Docker Compose                   |
+| Layer | Technology |
+| --- | --- |
+| Frontend | SvelteKit, TailwindCSS, Socket.IO client |
+| Backend | Node.js, Express.js, Socket.IO server |
+| Database | MongoDB (Mongoose) |
+| Realtime Adapter | `@socket.io/redis-adapter`, `redis` |
+| Dev/Deployment | Docker, Docker Compose |
 
----
-
-## Architecture & Folder Structure
+## Architecture and Folder Structure
 
 ```text
 chat-showcase/
-├─ backend/
-│  ├─ server.js
-│  ├─ package.json
-│  └─ routes/
-│      ├─ auth.js
-│      └─ messages.js
-├─ frontend/
-│  ├─ package.json
-│  ├─ svelte.config.js
-│  ├─ tailwind.config.cjs
-│  ├─ src/
-│      ├─ routes/
-│      │   ├─ +page.svelte
-│      │   └─ chat/[roomId]/+page.svelte
-│      ├─ lib/
-│      │   ├─ stores.js
-│      │   └─ socket.js
-│      └─ app.css
-├─ docker-compose.yml
-└─ README.md
++- backend/
+�  +- server.js
+�  +- package.json
+�  +- routes/
+�     +- auth.js
+�     +- messages.js
++- frontend/
+�  +- package.json
+�  +- svelte.config.js
+�  +- tailwind.config.cjs
+�  +- src/
+�     +- routes/
+�     �  +- +page.svelte
+�     �  +- chat/[roomId]/+page.svelte
+�     +- lib/
+�     �  +- stores.js
+�     �  +- socket.js
+�     +- app.css
++- docker-compose.yml
++- README.md
 ```
-
----
 
 ## Screenshots
 
-Insert screenshots here to visually showcase the app:
-
-**Login / Room Selector:**
-`[Insert Screenshot Link]`
-
-**Chat Room:**
-`[Insert Screenshot Link]`
-
-**Multi-Room Chat / Message Flow:**
-`[Insert Screenshot Link]`
-
----
+- Login / Room Selector: `[Insert Screenshot Link]`
+- Chat Room: `[Insert Screenshot Link]`
+- Multi-Room Chat / Message Flow: `[Insert Screenshot Link]`
 
 ## Code Highlights
 
-**Socket.IO Client Setup** (`frontend/src/lib/socket.js`):
+Socket.IO client setup (`frontend/src/lib/socket.js`):
 
-```javascript
+```js
 import { io } from "socket.io-client";
 export const socket = io("http://localhost:5000");
 ```
 
-**Real-Time Message Handling** (`chat/[roomId]/+page.svelte`):
+Real-time message handling (`frontend/src/routes/chat/[roomId]/+page.svelte`):
 
-```javascript
+```js
 socket.emit("joinRoom", roomId);
 socket.on("receiveMessage", (msg) => {
   messages.update((m) => [...m, msg]);
 });
 ```
 
-**Backend Socket.IO** (`backend/server.js`):
+Backend Socket.IO broadcast (`backend/server.js`):
 
-```javascript
+```js
 io.on("connection", (socket) => {
   socket.on("sendMessage", (data) => {
     io.to(data.roomId).emit("receiveMessage", data);
@@ -118,24 +94,67 @@ io.on("connection", (socket) => {
 });
 ```
 
----
+## Horizontal Scaling with Redis (Socket.IO Pub/Sub)
+
+Install backend dependencies:
+
+```bash
+cd backend
+npm i @socket.io/redis-adapter redis
+```
+
+Update `backend/server.js`:
+
+```js
+import { createClient } from "redis";
+import { createAdapter } from "@socket.io/redis-adapter";
+
+const pubClient = createClient({ url: process.env.REDIS_URL || "redis://redis:6379" });
+const subClient = pubClient.duplicate();
+
+await pubClient.connect();
+await subClient.connect();
+
+io.adapter(createAdapter(pubClient, subClient));
+```
+
+Add Redis service in `docker-compose.yml`:
+
+```yaml
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+```
+
+Scale backend instances:
+
+```bash
+docker compose up --build --scale backend=3
+```
+
+This allows messages emitted by one backend instance to be delivered to clients connected through other backend instances.
 
 ## Quick Start
 
 ```bash
 git clone <repository-url>
 cd chat-showcase
-docker-compose up --build
+docker compose up --build
 ```
 
-Open the app at [http://localhost:3000](http://localhost:3000) and start chatting.
-
----
+Then open [http://localhost:3000](http://localhost:3000).
 
 ## Future Enhancements
 
 - Full authentication (JWT + email/password)
 - Typing indicators and read receipts
 - File/media sharing
-- Deployment to cloud with SSL (DigitalOcean, AWS, etc.)
-- Horizontal scaling using Redis for Socket.IO pub/sub
+- Cloud deployment with SSL (DigitalOcean, AWS, Azure)
